@@ -1,74 +1,134 @@
 from __future__ import annotations
 
-import math
+import copy
 import itertools
 
 import numpy as np
 
 
 class Point:
-    """Класс точки"""
-    coords : np.ndarray
-    dim    : int
-    norm   : float
+    """
+    Purpose: Represents a point in n-dimensional space with coordinates and norm
+            Provides vector operations and coordinate management
+    """
+        
+    _coords : np.ndarray
+    _dim    : int
+    norm    : float
 
     def __init__(self, coords : np.ndarray, dim : int) -> None:
         """
-        Назначение: Инициализация точки
-        :param_data: coords: Координаты
-        :param_data: dim: Размерность пространства
-
-        :return: None
+        Purpose: Represents a point in n-dimensional space with coordinates and norm
+                Provides vector operations and coordinate management
+        
+        :param_data: coords: Coordinate values as numpy array
+        :param_data: dim: Dimension of the space
+        
+        :return: Point instance
         """
-        if dim != len(coords):
-            raise ValueError(f"Количество координат({coords}) не совпадает с размерностью({dim})")
-        
-        self.dim = dim
-        self.coords = coords.copy()  
+        self._dim = dim
+        self._coords = coords
         self.norm = self.__norm()
+
+    @property
+    def dim(self):
+        """
+        Purpose: Get or set the dimension of the point's space
+                 Validates dimension consistency when setting coordinates
         
+        :param_data: None (getter) or dim (setter)
+        
+        :return: int: Current dimension
+        """
+        return self._dim
+    
+    @dim.setter
+    def dim(self, dim):
+        """
+        Purpose: Get or set the dimension of the point's space
+                 Validates dimension consistency when setting coordinates
+        
+        :param_data: None (getter) or dim (setter)
+        
+        :return: int: Current dimension
+        """
+        self._dim = dim
+
+    @property
+    def coords(self):
+        """
+        Purpose: Get or set the point's coordinates
+                 Validates coordinate length matches dimension
+        
+        :param_data: None (getter) or coords (setter)
+        
+        :return: np.ndarray: Current coordinates
+        """
+
+        return self._coords
+    
+    @coords.setter
+    def coords(self, coords):
+        """
+        Purpose: Get or set the point's coordinates
+                 Validates coordinate length matches dimension
+        
+        :param_data: None (getter) or coords (setter)
+        
+        :return: np.ndarray: Current coordinates
+        """
+
+        if self.dim != len(coords):
+            raise ValueError(f"Количество координат({coords}) не совпадает с размерностью({self.dim})")
+        self._coords = coords.copy()
+
     def inner_prod(self, point : Point) -> float:
         """
-        Назначение: Вычисление скалярного произведения радиус векторов
-        :param_data: point: Радиус вектор другой точки
-
-        :return: inner_product
+        Purpose: Calculate inner product with another point's radius vector
+        
+        :param_data: point: Other point for calculation
+        
+        :return: float: Inner product value
         """
         return np.sum(self.coords * point.coords)
 
     def __sub__(self, point : Point) -> Point:
         """
-        Назначение: Вычитание радиус векторов
-        :param_data: point: Радиус вектор другой точки
-
-        :return: sub
+        Purpose: Subtract another point's radius vector
+        
+        :param_data: point: Other point for subtraction
+        
+        :return: Point: Resulting point
         """
         return Point(self.coords - point.coords, self.dim)
     
     def __add__(self, point : Point) -> Point:
         """
-        Назначение: Сложение радиус векторов
-        :param_data: point: Радиус вектор другой точки
-
-        :return: sum
+        Purpose: Add another point's radius vector
+        
+        :param_data: point: Other point for addition
+        
+        :return: Point: Resulting point
         """
         return Point(self.coords + point.coords, self.dim)
     
     def __mul__(self, val : float) -> Point:
         """
-        Назначение: умнжение радиус вектора на число
-        :param_data: val: Действительное число
-
-        :return: prod
+        Purpose: Multiply radius vector by scalar value
+        
+        :param_data: val: Scalar multiplier
+        
+        :return: Point: Scaled point
         """
         return Point(val * self.coords, self.dim)
     
     def __truediv__(self, val : float) -> Point:
         """
-        Назначение: Деление радиус вектора на число
-        :param_data: val: Действительное число
-
-        :return: div
+        Purpose: Divide radius vector by scalar value
+        
+        :param_data: val: Scalar divisor
+        
+        :return: Point: Scaled point
         """
         return Point(self.coords / val, self.dim)
     
@@ -83,41 +143,115 @@ class Point:
 
 
 class Simplex:
-    """Класс симплекса"""
-    points : list[Point]
-    dim    : int
-    order  : int
-    center : Point
+    """
+    Purpose: Represents a geometric simplex with vertices in n-dimensional space
+            Provides operations like reflection, bisection, and topological degree calculation
+    """
+    _points : list[Point]
+    _dim    : int
+    _order  : int
 
     def __init__(self, points : list[Point], dim : int, order : int) -> None:
         """
-        Назначение: Инициализация симплекса
-        :param_data: points: Вершины симплекса 
-        :param_data: dim: Размерность пространства
-        :param_data: order: Порядок симплекса
-
-        :return: None
+        Purpose: Represents a geometric simplex with vertices in n-dimensional space
+                Provides operations like reflection, bisection, and topological degree calculation
+        
+        :param_data: points: List of vertex Points
+        :param_data: dim: Space dimension
+        :param_data: order: Simplex order (number of vertices - 1)
+        
+        :return: Simplex instance
         """
-        self.points = points.copy()
-        self.dim = dim
-        self.order = order
-        self.center = self.__calc_center()
+        self._points = points
+        self._dim = dim
+        self._order = order
+
+    @property
+    def points(self):
+        """
+        Purpose: Get or set simplex vertices
+                 Maintains deep copies when setting
+        
+        :param_data: None (getter) or points (setter)
+        
+        :return: list[Point]: Current vertices
+        """
+        return self._points
+    
+    @points.setter
+    def dim(self, points):
+        """
+        Purpose: Get or set simplex vertices
+                 Maintains deep copies when setting
+        
+        :param_data: None (getter) or points (setter)
+        
+        :return: list[Point]: Current vertices
+        """
+        self._dim = copy.deepcopy(points)
+
+    @property
+    def dim(self):
+        """
+        Purpose: Get or set space dimension
+        
+        :param_data: None (getter) or dim (setter)
+        
+        :return: int: Current dimension
+        """
+        return self._dim
+    
+    @dim.setter
+    def dim(self, dim):
+        """
+        Purpose: Get or set space dimension
+        
+        :param_data: None (getter) or dim (setter)
+        
+        :return: int: Current dimension
+        """
+        self._dim = dim
+    
+    @property
+    def order(self):
+        """
+        Purpose: Get or set simplex order
+        
+        :param_data: None (getter) or order (setter)
+        
+        :return: int: Current order
+        """
+        return self._order
+    
+    @order.setter
+    def order(self, order):
+        """
+        Purpose: Get or set simplex order
+        
+        :param_data: None (getter) or order (setter)
+        
+        :return: int: Current order
+        """
+        self._order = order
 
     def calc_point_norms(self, func : function) -> np.ndarray:
         """
-        Назначение: Вычисление норм радиус векторов точек
-        :param_data: func: Функция f : R * n -> R * n
-
-        :return: norm: Норма радиус вектора
+        Purpose: Calculate norms of radius vectors after function transformation
+        
+        :param_data: func: Transformation function Rⁿ → Rⁿ
+        
+        :return: np.ndarray: Array of norm values
         """
         return np.array([np.sum(func(point.coords)**2) ** 0.5 for point  in  self.points])
     
     def reflection(self,  func : function) -> tuple:
         """
-        Назначение: Создание новых симплексов путем отражения
-        :param_data: func: Функция f : R * n -> R * n
-
-        :return: simplex1, simplex2: Новые симплексы
+        Purpose: Generate new simplices through reflection operation
+                 Based on function values at vertices
+        
+        :param_data: func: Function used for reflection calculation
+        
+        :return: tuple: (simplex1, simplex2, flag) - New simplices and inclusion flag
         """
         k, l = self.__calc_max_egde()
         middle_point = (self.points[k] + self.points[l]) / 2
@@ -182,11 +316,12 @@ class Simplex:
     
     def distance(self, target_point : Point) -> float:
         """
-        Назначение: Вычисление расстояния до симплекса по метрике 
-                    dist=min(||Xi - Y||), где Xi вершины симплекса
-        :param_data: target_point: Точка до которой вычисляется рассстояние
-
-        :return: min_dist: Минимальное расстояние от точки до симплекса
+        Purpose: Calculate minimal distance to target point
+                 Uses metric min(||Xi - Y||) where Xi are vertices
+        
+        :param_data: target_point: Point to measure distance to
+        
+        :return: float: Minimal distance value
         """
         min_dist = (self.points[0] - target_point).norm
         for point in self.points:
@@ -194,13 +329,15 @@ class Simplex:
             if min_dist > dist:
                 min_dist = dist
         return min_dist
+    
 
     def transform(self, function : function) -> Simplex:
         """
-        Назначение: Преобразование симплекса под действием функции 
-        :param_data: function: Функция f : R * n -> R * n
+        Purpose: Create transformed simplex by applying function to all vertices
         
-        :return: simplex: Симплекс с измененными координатами
+        :param_data: function: Transformation function Rⁿ → Rⁿ
+        
+        :return: Simplex: New transformed simplex
         """
         return Simplex(
             [Point(function(point.coords), self.dim) for point in self.points],
@@ -208,11 +345,11 @@ class Simplex:
     
     def check_point(self, point : Point) -> bool:
         """
-        Назначение: Проверка принадлежности точки симплексу, 
-                    используя теорему Каратеодори.
-        :param_data: point: Проверяемая точка
-
-        :return: bool: Истинность принадлежности
+        Purpose: Check if point belongs to simplex using Carathéodory's theorem
+        
+        :param_data: point: Point to check
+        
+        :return: bool: True if point is in simplex
         """
         coeffs = np.vstack(
             [
@@ -225,16 +362,16 @@ class Simplex:
             check_num = np.linalg.solve(coeffs, np.append(point.coords, 1))
         except np.linalg.LinAlgError:
             return False
-        
-        return (check_num >= 0).all()
+        return (check_num >= -1e-15).all()
         
     def bisect(self) -> tuple:
         """
-        Назначение: Разделение симплекса на два путем 
-                    деления пополам наибольшей стороны
+        Purpose: Bisect simplex by dividing longest edge
+                 Returns two new smaller simplices
+        
         :param_data: None
         
-        :return: tuple(simplex1, simplex2)
+        :return: tuple: (simplex1, simplex2) - Resulting simplices
         """
         k, l = self.__calc_max_egde()
         middle_point = (self.points[k] + self.points[l]) / 2
@@ -251,10 +388,11 @@ class Simplex:
     
     def calc_diameter(self) -> float:
         """
-        Назначение: Вычисление диаметра симплекса, как наибольшей его грани
+        Purpose: Calculate simplex diameter as length of longest edge
+        
         :param_data: None
         
-        :return: max_len
+        :return: float: Diameter value
         """
         max_len = 0
         for pair_index in itertools.combinations(range(self.order + 1), 2):
@@ -265,11 +403,13 @@ class Simplex:
     
     def calc_topological_degree(self, function : function, max_refinements : int = 5) -> float:
         """
-        Назначение: Вычисление степени отображения по алгоритму Кеарфотта
-        :param_data: function: Функция f : R * n -> R * n
-        :param_data: max_refinements: Количество уточняющих итераций
+        Purpose: Calculate topological degree using Kearfott's algorithm
+                 With optional refinement iterations
         
-        :return: degree: степень отображения
+        :param_data: function: Mapping function Rⁿ → Rⁿ
+        :param_data: max_refinements: Maximum refinement iterations
+        
+        :return: float: Calculated topological degree
         """
         degree = 0
         faces = self.__generate_faces()
@@ -286,21 +426,24 @@ class Simplex:
     
     def __needs_refinement(self, contributions: list) -> bool:
         """
-        Назначение: Проверка на необходимость дольнейшего 
-                    уточнения степени отображения
-        :param_data: contributions: Список степеней отображения для подсимплексов границы
+        Purpose: Determine if further refinement is needed for degree calculation
+                 Checks if all contributions are zero (private helper method)
         
-        :return: bool
+        :param_data: contributions: List of face contribution values
+        
+        :return: bool: True if refinement needed, False otherwise
         """
         return all(c == 0 for c in contributions)
     
     def __calc_face_contribution(self, func : function, face: tuple) -> int:
         """
-        Назначение: Вычисление степени отображения симплекса границы
-        :param_data: func: Функция f : R * n -> R * n
-        :param_data: face: Симплекс границы
+        Purpose: Calculate topological degree contribution of a boundary face
+                 Private method used in degree calculation
         
-        :return: par
+        :param_data: func: Mapping function Rⁿ → Rⁿ 
+        :param_data: face: Boundary face simplex
+        
+        :return: int: Contribution value (1, -1 or 0)
         """
         face_vertices = face
         face_signs = np.ndarray((self.order, self.order), dtype=int)
@@ -308,16 +451,17 @@ class Simplex:
         for i in range(self.order):
             for j in range(self.order):
                 face_signs[i, j] = sgn(func(face_vertices.points[i].coords)[j])
-        # print(face_signs)
         par = self.__par(face_signs)
         return par
     
     def __calc_max_egde(self) -> tuple:
         """
-        Назначение: Вычисление индексов ребра максимальной длины
+        Purpose: Find indices of the longest edge in simplex
+                 Private method used in bisection and reflection
+        
         :param_data: None
         
-        :return: indexes
+        :return: tuple: (index1, index2) of edge vertices
         """
         max_len = 0
         edge = (0, 0)
@@ -328,24 +472,14 @@ class Simplex:
                 edge = pair_index
         return edge[0], edge[1]
     
-    def __calc_center(self) -> Point:
-        """
-        Назначение: Вычисление центра массы симплекса
-        :param_data: None
-        
-        :return: point
-        """
-        center = Point(np.zeros(self.dim), self.dim)
-        for point in self.points:
-            center = center + point
-        return center / (self.order + 1)
-        
     def __generate_faces(self) -> list:
         """
-        Назначение: Генерация массива симплексов границы
+        Purpose: Generate all boundary faces of the simplex
+                 Private method used in topological degree calculation
+        
         :param_data: None
         
-        :return: list
+        :return: list: Tuples of (sign, face_simplex) for each boundary face
         """
         faces = []
         for i in range(0, self.order + 1):
@@ -356,11 +490,12 @@ class Simplex:
     
     def __par(self, signs_matrix : np.ndarray) -> int:
         """
-        Назначение: Вычисление степени отображения оосновываясь на матрице знаков
-        :param_data: signs_matrix: матрица знаков получаемая применением 
-                                   функции к каждой точке граничных симплексов
+        Purpose: Calculate topological degree from sign matrix
+                 Implements permutation checking (private helper method)
         
-        :return: par: степень отображения
+        :param_data: signs_matrix: Matrix of function sign evaluations
+        
+        :return: int: Degree contribution (1, -1 or 0)
         """
         mask_tril = np.tril(np.ones((self.order, self.order), dtype=bool))
         mask_diag = np.diag(np.ones(self.order - 1), k=1).astype(bool)
@@ -383,6 +518,13 @@ class Simplex:
         return 0
 
     def __str__(self):
+        """
+        Purpose: String representation of simplex vertices
+        
+        :param_data: None
+        
+        :return: str: Formatted vertex coordinates
+        """
         stringed_simplex = ""
         for i, point in enumerate(self.points):
             stringed_simplex += f"point{i} : "

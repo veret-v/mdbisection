@@ -5,6 +5,7 @@ import copy
 import numpy as np
 
 from mdbisection.simplex import Simplex, Point
+from mdbisection.simplex_system import StandartSimplex, SimplexSystem
 
 
 def top_deg_stage(
@@ -18,20 +19,23 @@ def top_deg_stage(
         dim : float
     ) -> tuple:
     """
-    Назначение: Данная функция, возвращает алгоритм на этап подсчета степени 
-                отображения, в случае если алгоритм не достиг точности за предельное 
-                число итераций, либо в случае если более тривиальные условия 
-                проверки принадлежности симплексу оказлись невалидны.
-    :param_data: working_simplex
-    :param_data: simplexes
-    :param_data: func
-    :param_data: max_diameter
-    :param_data: epsilon1
-    :param_data: m
-    :param_data: max_num_approx
-    :param_data: dim
+    Purpose: Handles the topological degree computation stage of the bisection algorithm when either:
+    1. The method fails to converge within maximum iterations, or
+    2. Standard simplex containment checks prove insufficient
+    This safeguards convergence by reverting to topological analysis.
 
-    :return: simplex: Корректный симплекс
+    :param_data: working_simplex: Current active simplex being refined (Simplex object)
+    :param_data: simplexes: List of all active simplices in the search tree (list[Simplex])
+    :param_data: func: Target function f: ℝⁿ → ℝⁿ defining the system (callable)
+    :param_data: max_diameter: Initial diameter of the search domain (float)
+    :param_data: epsilon1: Spatial tolerance threshold for simplex size (float)
+    :param_data: m: Current iteration counter (int)
+    :param_data: max_num_approx: Maximum allowed iterations before degree check (int)
+    :param_data: dim: Problem dimension n for ℝⁿ (int)
+
+    :return: tuple containing:
+        - simplex: Verified simplex with non-zero topological degree
+        - m: Reset iteration counter
     """
     if working_simplex.calc_diameter() / max_diameter <= 10 * epsilon1:
         if working_simplex.calc_topological_degree(func) != 0:
@@ -43,16 +47,19 @@ def top_deg_stage(
     j = m
     while (j > 0):
         simplex1, simplex2 = simplexes[j].bisect()
+
         if simplex1.calc_topological_degree(func) != 0:
             m = 0
             simplexes.clear()
             simplexes.append(simplex1)
             return simplex1, m
+        
         if simplex2.calc_topological_degree(func) != 0:
             m = 0 
             simplexes.clear()
             simplexes.append(simplex2)
             return simplex2, m
+        
         j -= 1
 
     simplex1, simplex2 = simplexes[0].bisect()
@@ -76,18 +83,21 @@ def solve_det_system(
 
     ) -> np.ndarray:
     """
-    Назначение: Поиск решения обобщенным методом бисекции 
-                для определенных систем нелинейных уравнений
-    :param_data: func: Функция f : R * n -> R * n
-    :param_data: init_simplex: Начальный симплекс
-    :param_data: epsilon1
-    :param_data: epsilon2
-    :param_data: dim: Размерность пространства
-    :param_data: max_num_approx: Максимальное количество симплексов 
-                                перед возвращением к стадии 
-                                определния существования решения
+    Purpose: Finds solutions to nonlinear equation systems using generalized multidimensional bisection method.
+            Implements a robust algorithm that combines simplex bisection with topological degree computation
+            to guarantee convergence to roots within the specified domain.
 
-    :return: simplexes: Массив сходящихся симплексов
+    :param_data: func: The vector function f: ℝⁿ → ℝⁿ defining the system of equations to solve
+    :param_data: init_simplex: Initial simplex defining the search domain in ℝⁿ⁺¹ space
+    :param_data: epsilon1: Tolerance for simplex diameter (stopping criterion for spatial refinement)
+    :param_data: epsilon2: Tolerance for function values (stopping criterion for solution accuracy) 
+    :param_data: dim: Dimension of the problem (n for ℝⁿ)
+    :param_data: max_num_approx: Maximum number of simplex refinements before reverting 
+                                to topological degree verification stage
+
+    :return: tuple containing:
+            - simplexes: List of all convergent simplices that potentially contain solutions
+            - solution: Approximate solution vector when found (None if no solution guaranteed)
     """
     m = 0
     max_diameter = init_simplex.calc_diameter()
@@ -99,48 +109,153 @@ def solve_det_system(
 
     if init_simplex.calc_topological_degree(func) == 0:
         print("Нет гарантии существования корня в симплексе. Метод не может быть применен.")
-        return simplexes
+        return simplexes, None
 
-    while(working_simplex.calc_diameter() > epsilon1 and (working_simplex.calc_point_norms(func) > epsilon2).any()):
+    while True:
+        if (working_simplex.calc_diameter() < epsilon1):
+            affine_trans = []
+            for i in range(dim):
+                coeffs = np.vstack(
+                    [
+                        np.stack([point.coords for point in working_simplex.points]).T, 
+                        np.ones(dim + 1)
+                    ]
+                )
+                affine_row = np.linalg.solve(
+                    coeffs.T, 
+                    np.array([func(point.coords)[i] for point in working_simplex.points])
+                )
+                affine_trans.append(affine_row)
+            affine_trans = np.stack(affine_trans) 
+            approx_solution = np.linalg.solve(affine_trans[:, :-1], -affine_trans[:, -1])
+            return output_simplexes, approx_solution
+        
+        if (working_simplex.calc_point_norms(func) < epsilon2).any():
+            approx_solution = np.array(working_simplex.points)[
+                (working_simplex.calc_point_norms(func) < epsilon2)
+            ][0].coords
+            return output_simplexes, approx_solution
+        
         if m == max_num_approx:
             working_simplex, m = top_deg_stage(
                 working_simplex, simplexes, func, 
                 max_diameter, epsilon1, m, max_num_approx, dim
             )
             max_diameter = working_simplex.calc_diameter()
-            print(1)
+
         else:
             simplex1, simplex2 = working_simplex.bisect()
+
             if simplex1.transform(func).check_point(Point(np.zeros(dim), dim)):
                 m += 1
                 simplexes.append(simplex1)
                 working_simplex = simplex1
-                print(2)
+
             elif simplex2.transform(func).check_point(Point(np.zeros(dim), dim)):
                 m += 1
                 simplexes.append(simplex2)
                 working_simplex = simplex2
-                print(3)
+
             else:
                 refl_simplex1, refl_simplex2, flag = working_simplex.reflection(func)
+
                 if refl_simplex1.transform(func).check_point(Point(np.zeros(dim), dim)) and flag:
                     m += 1
                     simplexes.append(refl_simplex1)
                     working_simplex = refl_simplex1
-                    print(4)
+
                 elif refl_simplex2.transform(func).check_point(Point(np.zeros(dim), dim)) and flag:
                     m += 1
                     simplexes.append(refl_simplex2)
                     working_simplex = refl_simplex2
-                    print(5)
+
                 else:
                     working_simplex, m = top_deg_stage(
                         working_simplex, simplexes, func, 
                         max_diameter, epsilon1, m, max_num_approx, dim
                     )
                     max_diameter = working_simplex.calc_diameter()
-                    print(6)
-        print(working_simplex.check_point(Point(np.array([0.1, 0.1, 0.1]), dim)))
-        output_simplexes.append(working_simplex)   
-    return output_simplexes
 
+        output_simplexes.append(working_simplex)   
+
+
+def optimize(
+        M : float, 
+        func : function, 
+        dim : int, 
+        center : Point, 
+        r : float, 
+        epsilon : float, 
+        initial_simplex : StandartSimplex
+    ) -> tuple:
+    """
+    Purpose: Optimizes a multivariable function using the multidimensional bisection method
+             within a specified domain by iteratively reducing simplex systems
+    
+    :param_data: M: Lipschitz constant for the function
+    :param_data: func: The target function f: R^n → R to be optimized
+    :param_data: dim: Dimension of the problem space
+    :param_data: center: Central point of the initial search domain
+    :param_data: r: Radius of the initial search domain
+    :param_data: epsilon: Convergence threshold for stopping the algorithm
+    :param_data: initial_simplex: Starting simplex for the optimization
+    
+    :return: tuple: (list of all evaluated simplexes, coordinates of the found optimum)
+    """
+    # initial_simplex = gen_init_simplex(r, center, M, func, dim)
+    lowest_top = copy.deepcopy(initial_simplex.apex)
+    lowest_top.coords[-1] = lowest_top.coords[-1] + initial_simplex.height
+    working_system = SimplexSystem([initial_simplex], dim + 1, dim + 2, lowest_top)
+    output_simplexes = [initial_simplex]
+    # print(initial_simplex)
+    while working_system.variation > epsilon:
+        working_system = working_system.reduction(func)
+        working_system = working_system.elimination()
+        output_simplexes += working_system.simplexes
+    return output_simplexes, working_system.lowest_top.coords
+
+
+def gen_init_simplex(r : float, c : Point, M : float, func : function, dim : int) -> StandartSimplex:
+    """
+    Purpose: Generates an initial standard simplex for the optimization algorithm
+             based on function evaluations at strategic points
+    
+    :param_data: r: Radius of the search domain
+    :param_data: c: Center point of the search domain
+    :param_data: M: Lipschitz constant for the function
+    :param_data: func: The target function f: R^n → R to be optimized
+    :param_data: dim: Dimension of the problem space
+    
+    :return: StandartSimplex: Properly configured initial simplex for optimization
+    """
+    u_k = np.zeros((dim + 2, dim + 1))
+    for k in range(dim + 1):
+        u_k[k, k] = 1.0
+    u_k[-1, :] = (-1.0)/(1 + np.sqrt(dim + 2)) * np.ones(dim + 1)
+    for k in range(dim + 1):
+        u_k[k, :] = u_k[k, :] - u_k[-1, :]
+    
+    u_k = u_k / np.linalg.norm(u_k[0])
+    
+    v = np.array([c.coords - r * u_k for u_k in u_k])
+    f_values  = np.array([func(v_k) for v_k in v])
+    m = np.min(f_values)
+    
+    sum_f = np.sum(f_values)
+    sum_terms = 0
+    for k in range(dim + 1):
+        sum_terms += (f_values[k] - m) * u_k[k]
+    
+    apex = c.coords + (1.0 / (M *  (dim + 2))) * sum_terms
+    apex[dim] = (sum_f/(dim + 2)) - M * (dim + 1)
+    apex = Point(apex, dim + 1)
+    height = M * dim * r - (1.0/(dim + 2)) * (sum_f - (dim + 2) * m) 
+    
+    base_vertices = []
+    for k in range(dim + 1):
+        vertex = apex.coords.copy()
+        vertex[:dim] += (height / M) * u_k[k][:dim]
+        vertex[dim] += height
+        base_vertices.append(Point(vertex, dim + 1))
+    
+    return StandartSimplex(base_vertices + [apex], dim + 1, dim + 2)
