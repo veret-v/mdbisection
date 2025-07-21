@@ -4,7 +4,7 @@ import copy
 
 import numpy as np
 
-from mdbisection.simplex import Simplex, Point
+from mdbisection.simplex import Simplex
 from mdbisection.simplex_system import StandartSimplex, SimplexSystem
 
 
@@ -117,13 +117,13 @@ def solve_det_system(
             for i in range(dim):
                 coeffs = np.vstack(
                     [
-                        np.stack([point.coords for point in working_simplex.points]).T, 
+                        np.stack([point for point in working_simplex.points]).T, 
                         np.ones(dim + 1)
                     ]
                 )
                 affine_row = np.linalg.solve(
                     coeffs.T, 
-                    np.array([func(point.coords)[i] for point in working_simplex.points])
+                    np.array([func(point)[i] for point in working_simplex.points])
                 )
                 affine_trans.append(affine_row)
             affine_trans = np.stack(affine_trans) 
@@ -133,7 +133,7 @@ def solve_det_system(
         if (working_simplex.calc_point_norms(func) < epsilon2).any():
             approx_solution = np.array(working_simplex.points)[
                 (working_simplex.calc_point_norms(func) < epsilon2)
-            ][0].coords
+            ][0]
             return output_simplexes, approx_solution
         
         if m == max_num_approx:
@@ -146,12 +146,12 @@ def solve_det_system(
         else:
             simplex1, simplex2 = working_simplex.bisect()
 
-            if simplex1.transform(func).check_point(Point(np.zeros(dim), dim)):
+            if simplex1.transform(func).check_point(np.zeros(dim)):
                 m += 1
                 simplexes.append(simplex1)
                 working_simplex = simplex1
 
-            elif simplex2.transform(func).check_point(Point(np.zeros(dim), dim)):
+            elif simplex2.transform(func).check_point(np.zeros(dim)):
                 m += 1
                 simplexes.append(simplex2)
                 working_simplex = simplex2
@@ -159,12 +159,12 @@ def solve_det_system(
             else:
                 refl_simplex1, refl_simplex2, flag = working_simplex.reflection(func)
 
-                if refl_simplex1.transform(func).check_point(Point(np.zeros(dim), dim)) and flag:
+                if refl_simplex1.transform(func).check_point(np.zeros(dim)) and flag:
                     m += 1
                     simplexes.append(refl_simplex1)
                     working_simplex = refl_simplex1
 
-                elif refl_simplex2.transform(func).check_point(Point(np.zeros(dim), dim)) and flag:
+                elif refl_simplex2.transform(func).check_point(np.zeros(dim)) and flag:
                     m += 1
                     simplexes.append(refl_simplex2)
                     working_simplex = refl_simplex2
@@ -183,7 +183,7 @@ def optimize(
         M : float, 
         func : function, 
         dim : int, 
-        center : Point, 
+        center : np.ndarray, 
         r : float, 
         epsilon : float, 
         initial_simplex : StandartSimplex
@@ -203,19 +203,21 @@ def optimize(
     :return: tuple: (list of all evaluated simplexes, coordinates of the found optimum)
     """
     # initial_simplex = gen_init_simplex(r, center, M, func, dim)
-    lowest_top = copy.deepcopy(initial_simplex.apex)
-    lowest_top.coords[-1] = lowest_top.coords[-1] + initial_simplex.height
+    lowest_top = initial_simplex.apex.copy()
+    lowest_top[-1] = lowest_top[-1] + initial_simplex.height
     working_system = SimplexSystem([initial_simplex], dim + 1, dim + 2, lowest_top)
-    output_simplexes = [initial_simplex]
-    # print(initial_simplex)
+    out_simplexes = []
+
     while working_system.variation > epsilon:
-        working_system = working_system.reduction(func)
-        working_system = working_system.elimination()
-        output_simplexes += working_system.simplexes
-    return output_simplexes, working_system.lowest_top.coords
+        working_system = working_system.reduction(func).elimination()
+        out_simplexes.append(working_system.simplexes[0])
+        print(working_system.variation)
+        print(len(working_system.simplexes))
+        
+    return out_simplexes, working_system.lowest_top
 
 
-def gen_init_simplex(r : float, c : Point, M : float, func : function, dim : int) -> StandartSimplex:
+def gen_init_simplex(r : float, c : np.ndarray, M : float, func : function, dim : int) -> StandartSimplex:
     """
     Purpose: Generates an initial standard simplex for the optimization algorithm
              based on function evaluations at strategic points
@@ -248,7 +250,7 @@ def gen_init_simplex(r : float, c : Point, M : float, func : function, dim : int
     
     apex = c.coords + (1.0 / (M *  (dim + 2))) * sum_terms
     apex[dim] = (sum_f/(dim + 2)) - M * (dim + 1)
-    apex = Point(apex, dim + 1)
+    apex = apex
     height = M * dim * r - (1.0/(dim + 2)) * (sum_f - (dim + 2) * m) 
     
     base_vertices = []
@@ -256,6 +258,6 @@ def gen_init_simplex(r : float, c : Point, M : float, func : function, dim : int
         vertex = apex.coords.copy()
         vertex[:dim] += (height / M) * u_k[k][:dim]
         vertex[dim] += height
-        base_vertices.append(Point(vertex, dim + 1))
+        base_vertices.append(vertex)
     
     return StandartSimplex(base_vertices + [apex], dim + 1, dim + 2)

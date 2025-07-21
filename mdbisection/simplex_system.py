@@ -7,7 +7,7 @@ import numpy as np
 import copy
 from collections import Counter
 
-from .simplex import Simplex, Point
+from .simplex import Simplex
 
 
 class StandartSimplex(Simplex):
@@ -16,11 +16,11 @@ class StandartSimplex(Simplex):
              Provides methods for simplex reduction and elimination operations
     """
 
-    _base   : list[Point]
-    _apex : Point
+    _base   : np.ndarray
+    _apex   : np.ndarray
     _height : float
 
-    def __init__(self, points : list[Point], dim : int, order : int) -> None:
+    def __init__(self, points : np.ndarray, dim : int, order : int) -> None:
         """
         Purpose: Represents a standard simplex with base points, apex, and height properties
                 Provides methods for simplex reduction and elimination operations
@@ -84,32 +84,32 @@ class StandartSimplex(Simplex):
         new_base = []
         h_new = 0
 
-        if self.height <=  func_val - self.apex.coords[self.dim- 1] <= self.height * (self.dim + 1):
-            h_new = self.height - 1 / (self.dim + 1) * (func_val - self.apex.coords[self.dim- 1])
+        if self.height <=  func_val - self.apex[self.dim- 1] <= self.height * (self.dim + 1):
+            h_new = self.height - 1 / (self.dim + 1) * (func_val - self.apex[self.dim- 1])
 
             for base_point in self.base:
                 support_vec = (self.apex - base_point) 
                 support_vecs.append(support_vec)
 
             for support_vec1 in support_vecs:
-                new_apex = self.apex - support_vec1 * (func_val - self.apex.coords[self.dim- 1]) / (self.height * (self.dim + 1))
+                new_apex = self.apex - support_vec1 * (func_val - self.apex[self.dim- 1]) / (self.height * (self.dim + 1))
                 new_std_simplex = StandartSimplex(
-                    [new_apex] + [new_apex - support_vec2 * h_new / self.height for support_vec2 in support_vecs], 
+                    np.stack([new_apex] + [new_apex - support_vec2 * h_new / self.height for support_vec2 in support_vecs]), 
                     self.dim, self.order
                 )
                 gen_simplexes.append(new_std_simplex)
 
-        elif 0 < func_val - self.apex.coords[self.dim- 1] < self.height:
-            h_new = self.dim / (self.dim + 1) * (func_val - self.apex.coords[self.dim- 1])
+        elif 0 <= func_val - self.apex[self.dim- 1] < self.height:
+            h_new = self.dim / (self.dim + 1) * (func_val - self.apex[self.dim- 1])
 
             for base_point in self.base:
                 support_vec = (self.apex - base_point) 
                 support_vecs.append(support_vec)
 
             for support_vec1 in support_vecs:
-                new_apex = self.apex - support_vec1 * (func_val - self.apex.coords[self.dim- 1] - h_new) / self.height
+                new_apex = self.apex - support_vec1 * (func_val - self.apex[self.dim- 1] - h_new) / self.height
                 new_std_simplex = StandartSimplex(
-                    [new_apex] + [new_apex - support_vec2 * h_new / self.height for support_vec2 in support_vecs], 
+                    np.stack([new_apex] + [new_apex - support_vec2 * h_new / self.height for support_vec2 in support_vecs]), 
                     self.dim, self.order
                 )
                 gen_simplexes.append(new_std_simplex)
@@ -128,58 +128,47 @@ class StandartSimplex(Simplex):
         
         :return: StandartSimplex or None: Modified simplex or None if eliminated
         """
-        if self.apex.coords[self.dim - 1] >= el_height:
+        if self.apex[self.dim - 1] >= el_height:
             return None
         
-        if self.apex.coords[self.dim - 1] + self.height <= el_height:
+        if self.apex[self.dim - 1] + self.height <= el_height:
             return self
         
         new_base  = []
 
-        for base_point in self._base:
-            new_base_point = base_point - (self.apex - base_point) * abs(el_height - self.apex.coords[self.dim- 1]) / self.height
+        for base_point in self.base:
+            new_base_point = self.apex - (self.apex - base_point) * (el_height - self.apex[self.dim- 1]) / self.height
             new_base.append(new_base_point)
 
-        return StandartSimplex([self.apex] + new_base, self.dim, self.order)
+        try:
+            return StandartSimplex(np.stack(new_base + [self.apex]), self.dim, self.order)
+        except TypeError:
+            return None
 
     @staticmethod
-    def __check_calc_standart(points, dim, order):
-        if order != dim + 1:
-            raise ValueError("Incorrect number of points")
-        
-        mask = [point.coords[dim - 1] for point in points]
+    def __check_calc_standart(points : np.ndarray, dim : int, order : int):
+        mask = np.array([point[dim - 1] for point in points])
         unique_elem = list(set(mask))
         counted_elem = Counter(mask)
 
         if len(unique_elem) != 2:
-            for point in points: print(point.coords)
-            raise ValueError("Not standart simplex")
-        
+            raise TypeError("Not standart simplex : not only 2 heights")
+                
         if counted_elem[unique_elem[0]] == 1:
-            base      = copy.deepcopy(points)
-            min_point = base.pop(mask.index(unique_elem[0]))
-            height    = mask[mask.index(unique_elem[1])] - mask[mask.index(unique_elem[0])] 
-
-            if height < 0:
-                for point in points: print(point.coords)
-                raise TypeError("Not standart simplex")
-            
-            return base, min_point, height
-        
-        if counted_elem[unique_elem[1]] == 1:
-            base      = copy.deepcopy(points)
-            min_point = base.pop(mask.index(unique_elem[1]))
-            height    = mask[mask.index(unique_elem[0])] - mask[mask.index(unique_elem[1])] 
-
-            if height < 0:
-                for point in points: print(point.coords)
-                raise TypeError("Not standart simplex")
-            
-            return base, min_point, height
-        
-        for point in points: print(point.coords)
-        raise ValueError("Not standart simplex")
+            min_point = points[mask == unique_elem[0]].reshape(-1)
+            base      = np.delete(points, np.where(mask == unique_elem[0])[0], axis=0)
+            height    = (mask[mask == unique_elem[1]] - mask[mask == unique_elem[0]])[dim - 1]
     
+        elif counted_elem[unique_elem[1]] == 1:
+            
+            min_point = points[mask == unique_elem[1]].reshape(-1)
+            base      = np.delete(points, np.where(mask == unique_elem[1])[0], axis=0)
+            height    = (mask[mask == unique_elem[0]] - mask[mask == unique_elem[1]])[dim - 1] 
+            
+        if height < 0:
+                raise TypeError(f"Not standart simplex: height({height}) < 0")
+        
+        return base, min_point, height
     
 class SimplexSystem:
     """
@@ -189,7 +178,7 @@ class SimplexSystem:
     _simplexes  : list[StandartSimplex]
     _dim        : int
     _order      : int
-    _lowest_top : Point
+    _lowest_top : np.ndarray
     _variation  : float
     
     def __init__(self, simplexes, dim, order, lowest_top):
@@ -319,15 +308,17 @@ class SimplexSystem:
         :return: SimplexSystem: New system with reduced simplices
         """
         reducted_simplexes = []
-        lowest_top_red = copy.deepcopy(self.lowest_top)
+        lowest_top_red = self.lowest_top.copy()
         for std_simplex in self.simplexes:
-            reducted_simplexes.append(
-                std_simplex.reduction(func(std_simplex.apex.coords[:self.dim - 1]))
-            )
-            if func(std_simplex.apex.coords[:self.dim - 1]) < lowest_top_red.coords[self.dim - 1]:
-                lowest_top_red = copy.deepcopy(std_simplex.apex)
-                lowest_top_red.coords[-1] = func(std_simplex.apex.coords[:self.dim - 1])
-    
+            reducted_simplex = std_simplex.reduction(func(std_simplex.apex[:self.dim - 1]))
+
+            if reducted_simplex is not None:
+                reducted_simplexes.append(reducted_simplex)
+
+            if func(std_simplex.apex[:self.dim - 1]) < lowest_top_red[self.dim - 1]:
+                lowest_top_red = std_simplex.apex.copy()
+                lowest_top_red[-1] = func(std_simplex.apex[:self.dim - 1])
+
         return SimplexSystem(list(
             itertools.chain(
                 *reducted_simplexes
@@ -344,9 +335,11 @@ class SimplexSystem:
         """
         eliminated_simplexes = []
         for std_simplex in self.simplexes:
-            eliminated_simplex = std_simplex.elimination(self.lowest_top.coords[self.dim - 1])
+            eliminated_simplex = std_simplex.elimination(self.lowest_top[self.dim - 1])
+
             if eliminated_simplex is not None:
                 eliminated_simplexes.append(eliminated_simplex)
+
         return SimplexSystem(eliminated_simplexes, self.dim, self.order, self.lowest_top)
     
     def __calc_variation(self):
@@ -357,7 +350,7 @@ class SimplexSystem:
         
         :return: variation: float value
         """
-        min_points = [std_simplex.apex.coords[self.dim - 1] for std_simplex in self.simplexes]
-        max_heights = [std_simplex.apex.coords[self.dim - 1] + std_simplex.height for std_simplex in self.simplexes]
-        return max(max_heights) - min(min_points)
+        min_points = np.array([std_simplex.apex[self.dim - 1] for std_simplex in self.simplexes])
+        max_heights = np.array([std_simplex.apex[self.dim - 1] + std_simplex.height for std_simplex in self.simplexes])
+        return np.max(max_heights) - np.min(min_points)
     

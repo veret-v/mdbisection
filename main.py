@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
-from mdbisection.simplex import Simplex, Point
+from mdbisection.simplex import Simplex
 from mdbisection.simplex_system import StandartSimplex
 from mdbisection.algorithms import solve_det_system, optimize
 from mdbisection.visualize import draw_algorithm_2d, draw_algorithm_3d, draw_optimize_3d
@@ -57,51 +57,57 @@ def F2_optim(X : np.ndarray) -> float:
 
 def F2_optim_draw(X : np.ndarray, Y : np.ndarray) -> float:
     return -np.exp(-X ** 2) * np.sin(X) + np.abs(Y)
+
+def F2_optim1(X : np.ndarray) -> float:
+    return max(3 ** 0.5 * X[0] + X[1], -2 * X[1], X[1] - 3 ** 0.5 * X[0])
+
+def F2_optim1_draw(X : np.ndarray, Y : np.ndarray) -> float:
+    return np.max(max(3 ** 0.5 * X + Y, -2 * Y, Y - 3 ** 0.5 * X))
    
     
 if __name__ == '__main__':
 
     # init_simplex_opt = StandartSimplex(
-    #         [
-    #             Point(np.array([0, 0, -3]), 3), 
-    #             Point(np.array([2, 0, 1]), 3), 
-    #             Point(np.array([0, 1, 1]), 3),
-    #             Point(np.array([0, -1, 1]), 3)
-    #         ], 3, 4)         
-    # simplexes, optimum = optimize(1, F2_optim, 2, Point(np.array([0, 0, 0]), 3), 20, 1e-1, init_simplex_opt)
-    # draw_optimize_3d(simplexes[:15], F2_optim_draw)
-    # draw_optimize_3d(simplexes[:10], F2_optim_draw)
-    # draw_optimize_3d(simplexes[:5], F2_optim_draw)
+    #         np.array([
+    #             [0, 0, -3], 
+    #             [7, 0, 1], 
+    #             [0, 2, 1],
+    #             [0, -2, 1],
+    #         ]), 3, 3)         
+    # simplexes, optimum = optimize(1, F2_optim, 2, np.array([0, 0, 0]), 20, 1e-2, init_simplex_opt)
+    # print(optimum)
+    # draw_optimize_3d(simplexes, F2_optim_draw)
 
-    init_simplex_2 = Simplex(
-            [
-                Point(np.array([0.33, 0.33]), 2), 
-                Point(np.array([-0.33, 0]), 2), 
-                Point(np.array([0, -0.33]), 2)
-            ], 2, 2)       
-    simplexes2, solution = solve_det_system(F2, init_simplex_2, epsilon1=1e-8, epsilon2=1e-6, dim=2, max_num_approx=100)
-    print(solution)
-    draw_algorithm_2d(simplexes2, F_draw_2D) 
-
-    # init_simplex_3 = Simplex(
-    #         [
-    #             Point(np.array([-1, -1, -1]), 3), 
-    #             Point(np.array([1, 0, 0]), 3), 
-    #             Point(np.array([0, 1, 0]), 3),
-    #             Point(np.array([0, 0, 1]), 3)
-    #         ], 3, 3)       
-    # simplexes3, solution = solve_det_system(F3, init_simplex_3, epsilon1=1e-8, epsilon2=1e-6, dim=3, max_num_approx=10)
+    # init_simplex_2 = Simplex(
+    #         np.array([
+    #             [0.5, 0.8], 
+    #             [0.5, -0.5], 
+    #             [-7, -0.5]
+    #         ]), 2, 2)       
+    # simplexes2, solution = solve_det_system(F2, init_simplex_2, epsilon1=1e-8, epsilon2=1e-6, dim=2, max_num_approx=100)
     # print(solution)
-    # draw_algorithm_3d(simplexes3, F_draw_3D) 
+    # draw_algorithm_2d(simplexes2, F_draw_2D) 
+
+    init_simplex_3 = Simplex(
+            np.array([
+                [-1, -1, -1], 
+                [1, 0, 0], 
+                [0, 1, 0],
+                [0, 0, 1],
+            ]), 3, 3)       
+    simplexes3, solution = solve_det_system(F3, init_simplex_3, epsilon1=1e-8, epsilon2=1e-6, dim=3, max_num_approx=10)
+    print(solution)
+    draw_algorithm_3d(simplexes3, F_draw_3D) 
 
     # init_simplex_5 = Simplex(
-    #         [
-    #             Point(np.array([0.2, 0.2, 0.2, 0.2, 0.2]), 5), 
-    #             Point(np.array([-0.2, 0, 0, 0, 0]), 5), 
-    #             Point(np.array([0, -0.2, 0, 0, 0]), 5), 
-    #             Point(np.array([0, 0, -0.2, 0, 0]), 5), 
-    #             Point(np.array([0, 0, 0, -0.2, 0]), 5), 
-    #             Point(np.array([0, 0, 0, 0, -0.2]), 5), 
-    #         ], 5, 6)
+    #         np.array([
+    #             [0.2, 0.2, 0.2, 0.2, 0.2], 
+    #             [-0.2, 0, 0, 0, 0], 
+    #             [0, -0.2, 0, 0, 0], 
+    #             [0, 0, -0.2, 0, 0], 
+    #             [0, 0, 0, -0.2, 0], 
+    #             [0, 0, 0, 0, -0.2], 
+    #         ]), 5, 6)
     # simplexes5, solution = solve_det_system(F5, init_simplex_5, epsilon1=1e-8, epsilon2=1e-6, dim=5, max_num_approx=30)
     # print(solution)
+

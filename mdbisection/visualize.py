@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
-from .simplex import Simplex, Point
+from .simplex import Simplex
 
 
 def F_draw_2d(X : np.ndarray, Y : np.ndarray) -> tuple:
@@ -54,19 +54,17 @@ def test_draw_2d() -> None:
     :return: None
     """
     simplex1 = Simplex(
-            [
-                Point(np.array([0, 0]), 2), 
-                Point(np.array([1, 0]), 2), 
-                Point(np.array([0.5, 1]), 2)
-            ]
-        ,2 ,2)
+            np.array([
+                [0, 0], 
+                [1, 0], 
+                [0.5, 1]
+            ]) ,2 ,2)
     simplex2 = Simplex(
-            [
-                Point(np.array([1, 0]), 2), 
-                Point(np.array([2, 0]), 2), 
-                Point(np.array([1.5, 1]), 2)
-            ]
-        ,2 ,2)
+            np.array([
+                [1, 0], 
+                [2, 0], 
+                [1.5, 1]
+            ]) ,2 ,2)
     draw_algorithm_2d(np.array([simplex1, simplex2]), F_draw_2d)
 
 
@@ -80,19 +78,19 @@ def test_draw_3d() -> None:
     :return: None
     """
     simplex1 = Simplex(
-        [
-            Point(np.array([0.2, 0.2, 0.2]), 3), 
-            Point(np.array([-0.2, 0, 0]), 3), 
-            Point(np.array([0, -0.2, 0]), 3), 
-            Point(np.array([0, 0, -0.2]), 3), 
-        ], 3, 3)
+        np.array([
+            [0.2, 0.2, 0.2], 
+            [-0.2, 0, 0], 
+            [0, -0.2, 0], 
+            [0, 0, -0.2], 
+        ]), 3, 3)
     simplex2 = Simplex(
-        [
-            Point(np.array([0.2, 0.2, 0.2]), 3), 
-            (Point(np.array([-0.2, 0, 0]), 3) + Point(np.array([0.2, 0.2, 0.2]), 3)) / 2, 
-            Point(np.array([0, -0.2, 0]), 3), 
-            Point(np.array([0, 0, -0.2]), 3), 
-        ], 3, 3)
+        np.array([
+            [0.2, 0.2, 0.2], 
+            ([-0.2, 0, 0] + [0.2, 0.2, 0.2]) / 2, 
+            [0, -0.2, 0], 
+            [0, 0, -0.2], 
+        ]), 3, 3)
     draw_algorithm_3d(np.array([simplex1, simplex2]), F_draw_3d)
 
 
@@ -174,9 +172,9 @@ def draw_algorithm_3d(
     )
     
     for tetrader in simplexes:
-        points = np.array([[coord for coord in point.coords] for point in tetrader.points])
+        points = tetrader.points
         
-        edges = [
+        edges =  [
             (0, 1), (0, 2), (0, 3),  
             (1, 2), (2, 3), (3, 1)  
         ]
@@ -260,9 +258,9 @@ def draw_optimize_3d(
     )
     
     for tetrader in simplexes:
-        points = np.array([[coord for coord in point.coords] for point in tetrader.points])
+        points = tetrader.points
         
-        edges = [
+        edges =  [
             (0, 1), (0, 2), (0, 3),  
             (1, 2), (2, 3), (3, 1)  
         ]
@@ -339,7 +337,7 @@ def draw_algorithm_2d(simplexes : list, func : function, range_x : tuple = (-1, 
 
     triangles = [
         [
-            [coord for coord in point.coords] 
+            [point for point in point] 
             for point in simplex.points
         ] 
         for simplex in simplexes]
