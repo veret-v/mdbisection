@@ -6,7 +6,8 @@ from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
-from .simplex import Simplex, Point
+from .simplex import Simplex
+from .char_polyhedron import CharPolyhedron
 
 
 def F_draw_2d(X : np.ndarray, Y : np.ndarray) -> tuple:
@@ -54,19 +55,17 @@ def test_draw_2d() -> None:
     :return: None
     """
     simplex1 = Simplex(
-            [
-                Point(np.array([0, 0]), 2), 
-                Point(np.array([1, 0]), 2), 
-                Point(np.array([0.5, 1]), 2)
-            ]
-        ,2 ,2)
+            np.array([
+                [0, 0], 
+                [1, 0], 
+                [0.5, 1]
+            ]) ,2 ,2)
     simplex2 = Simplex(
-            [
-                Point(np.array([1, 0]), 2), 
-                Point(np.array([2, 0]), 2), 
-                Point(np.array([1.5, 1]), 2)
-            ]
-        ,2 ,2)
+            np.array([
+                [1, 0], 
+                [2, 0], 
+                [1.5, 1]
+            ]) ,2 ,2)
     draw_algorithm_2d(np.array([simplex1, simplex2]), F_draw_2d)
 
 
@@ -80,19 +79,19 @@ def test_draw_3d() -> None:
     :return: None
     """
     simplex1 = Simplex(
-        [
-            Point(np.array([0.2, 0.2, 0.2]), 3), 
-            Point(np.array([-0.2, 0, 0]), 3), 
-            Point(np.array([0, -0.2, 0]), 3), 
-            Point(np.array([0, 0, -0.2]), 3), 
-        ], 3, 3)
+        np.array([
+            [0.2, 0.2, 0.2], 
+            [-0.2, 0, 0], 
+            [0, -0.2, 0], 
+            [0, 0, -0.2], 
+        ]), 3, 3)
     simplex2 = Simplex(
-        [
-            Point(np.array([0.2, 0.2, 0.2]), 3), 
-            (Point(np.array([-0.2, 0, 0]), 3) + Point(np.array([0.2, 0.2, 0.2]), 3)) / 2, 
-            Point(np.array([0, -0.2, 0]), 3), 
-            Point(np.array([0, 0, -0.2]), 3), 
-        ], 3, 3)
+        np.array([
+            [0.2, 0.2, 0.2], 
+            ([-0.2, 0, 0] + [0.2, 0.2, 0.2]) / 2, 
+            [0, -0.2, 0], 
+            [0, 0, -0.2], 
+        ]), 3, 3)
     draw_algorithm_3d(np.array([simplex1, simplex2]), F_draw_3d)
 
 
@@ -174,9 +173,9 @@ def draw_algorithm_3d(
     )
     
     for tetrader in simplexes:
-        points = np.array([[coord for coord in point.coords] for point in tetrader.points])
+        points = tetrader.points
         
-        edges = [
+        edges =  [
             (0, 1), (0, 2), (0, 3),  
             (1, 2), (2, 3), (3, 1)  
         ]
@@ -260,9 +259,9 @@ def draw_optimize_3d(
     )
     
     for tetrader in simplexes:
-        points = np.array([[coord for coord in point.coords] for point in tetrader.points])
+        points = tetrader.points
         
-        edges = [
+        edges =  [
             (0, 1), (0, 2), (0, 3),  
             (1, 2), (2, 3), (3, 1)  
         ]
@@ -316,7 +315,7 @@ def draw_optimize_3d(
     fig.show()
 
 
-def draw_algorithm_2d(simplexes : list, func : function, range_x : tuple = (-1, 1), range_y : tuple = (-1, 1)) -> None:
+def draw_algorithm_2d(iterations : list, func : function, range_x : tuple = (-3, 3), range_y : tuple = (-3, 3)) -> None:
     """
     Purpose: Visualizes 2D nonlinear system and simplex algorithm progress
              using contour plots and filled simplex polygons
@@ -334,28 +333,40 @@ def draw_algorithm_2d(simplexes : list, func : function, range_x : tuple = (-1, 
     X, Y = np.meshgrid(x, y)
     Z1, Z2 = func(X, Y)
     fig, ax = plt.subplots()
-    CS1 = ax.contour(X, Y, Z1, levels=[0], colors='r', linewidths=1)
-    CS2 = ax.contour(X, Y, Z2, levels=[0], colors='b', linewidths=1)
+    CS1 = ax.contour(X, Y, Z1, levels=[0], colors='r', linewidths=1, label='Первая линия 0 уровня')
+    CS2 = ax.contour(X, Y, Z2, levels=[0], colors='b', linewidths=1, label='Вторая линия 0 уровня')
 
-    triangles = [
-        [
-            [coord for coord in point.coords] 
-            for point in simplex.points
-        ] 
-        for simplex in simplexes]
-    for triangle in triangles:
-        polygon = Polygon(triangle, closed=True, fill=True, alpha=0.5, edgecolor='m', facecolor='g', linewidth=1)
-        ax.add_patch(polygon)
+    if all([isinstance(iteration, Simplex) for iteration in iterations]):
+        triangles = [
+            [
+                [coord for coord in point] 
+                for point in simplex.points
+            ] 
+            for simplex in iterations]
+        for triangle in triangles:
+            polygon = Polygon(triangle, closed=True, fill=True, alpha=0.5, edgecolor='m', facecolor='g', linewidth=1)
+            ax.add_patch(polygon)
+
+    elif all([isinstance(iteration, CharPolyhedron) for iteration in iterations]):
+        polygons = [
+            [
+                [point for point in vertice] 
+                for vertice in polygon.vertices
+            ] 
+            for polygon in iterations]
+        for polygon in polygons:
+            xy_array = np.array([polygon[0], polygon[2], polygon[3], polygon[1], polygon[0]])
+            polygon = Polygon(xy_array, closed=True, fill=True, alpha=0.5, edgecolor='m', facecolor='g', linewidth=1)
+            ax.add_patch(polygon)
+
 
     ax.clabel(CS1, fontsize=10)
     ax.clabel(CS2, fontsize=10)
     ax.set_title('Изображение итераций алгоритма')
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_xlim((-1, 1))
-    ax.set_ylim((-1, 1))
+    ax.set_xlim(range_x)
+    ax.set_ylim(range_y)
     ax.grid(True)
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))  
-    ax.legend(by_label.values(), by_label.keys(), loc='best')
+    ax.legend()
     plt.show()
